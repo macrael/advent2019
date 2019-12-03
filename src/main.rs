@@ -12,4 +12,5 @@ fn main() {
     println!("two-b: {}", two::two_b());
 
     println!("three-a: {}", three::three_a());
+    println!("three-b: {}", three::three_b());
 }
