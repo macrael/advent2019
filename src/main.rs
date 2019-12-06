@@ -1,3 +1,4 @@
+mod four;
 mod one;
 mod three;
 mod two;
@@ -13,4 +14,7 @@ fn main() {
 
     println!("three-a: {}", three::three_a());
     println!("three-b: {}", three::three_b());
+
+    println!("four-a: {}", four::four_a());
+    println!("four-b: {}", four::four_b());
 }
