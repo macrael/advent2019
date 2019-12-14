@@ -6,6 +6,10 @@ enum OpCode {
     Mult,
     Input,
     Output,
+    JumpIfTrue,
+    JumpIfFalse,
+    LessThan,
+    Equals,
     Halt,
 }
 
@@ -44,10 +48,17 @@ fn parse_code(code: i32) -> (OpCode, ArgMode, ArgMode, ArgMode) {
         2 => OpCode::Mult,
         3 => OpCode::Input,
         4 => OpCode::Output,
+        5 => OpCode::JumpIfTrue,
+        6 => OpCode::JumpIfFalse,
+        7 => OpCode::LessThan,
+        8 => OpCode::Equals,
 
         99 => OpCode::Halt,
 
-        _ => panic!(),
+        _ => {
+            println!("WAT: {}", parsed_code);
+            panic!()
+        }
     };
 
     let m1 = parse_mode(hundreads);
@@ -118,6 +129,55 @@ fn run_program(program: Vec<i32>, input: i32) -> (Vec<i32>, Vec<i32>) {
 
                 pc += 2
             }
+            OpCode::JumpIfTrue => {
+                let a = get_arg(&prog, pc + 1, m1);
+                let b = get_arg(&prog, pc + 2, m2);
+
+                if a != 0 {
+                    pc = b.try_into().unwrap();
+                } else {
+                    pc += 3;
+                }
+            }
+            OpCode::JumpIfFalse => {
+                let a = get_arg(&prog, pc + 1, m1);
+                let b = get_arg(&prog, pc + 2, m2);
+
+                if a == 0 {
+                    pc = b.try_into().unwrap();
+                } else {
+                    pc += 3;
+                }
+            }
+            OpCode::LessThan => {
+                let a = get_arg(&prog, pc + 1, m1);
+                let b = get_arg(&prog, pc + 2, m2);
+
+                let dest: usize = prog[pc + 3].try_into().unwrap();
+
+                if a < b {
+                    prog[dest] = 1
+                } else {
+                    prog[dest] = 0
+                }
+
+                pc += 4
+            }
+            OpCode::Equals => {
+                let a = get_arg(&prog, pc + 1, m1);
+                let b = get_arg(&prog, pc + 2, m2);
+
+                let dest: usize = prog[pc + 3].try_into().unwrap();
+
+                if a == b {
+                    prog[dest] = 1
+                } else {
+                    prog[dest] = 0
+                }
+
+                pc += 4
+            }
+
             OpCode::Halt => {
                 // exit
                 break;
@@ -166,8 +226,6 @@ const INPUT: [i32; 678] = [
     674, 101, 1, 223, 223, 4, 223, 99, 226,
 ];
 
-const GOAL: i32 = 19690720;
-
 pub fn five_a() -> i32 {
     let input_prog = INPUT.to_vec();
 
@@ -185,22 +243,22 @@ pub fn five_a() -> i32 {
     return diagnostic;
 }
 
-// pub fn two_b() -> i32 {
-//     for noun in 0..99 {
-//         for verb in 0..99 {
-//             let mut input_prog = INPUT.to_vec();
-//             input_prog[1] = noun;
-//             input_prog[2] = verb;
+pub fn five_b() -> i32 {
+    let input_prog = INPUT.to_vec();
 
-//             let output_prog = run_program(input_prog);
-//             if output_prog[0] == GOAL {
-//                 return 100 * noun + verb;
-//             }
-//         }
-//     }
+    let (_, mut output) = run_program(input_prog, 5);
 
-//     return -1;
-// }
+    let diagnostic = output.remove(output.len() - 1);
+
+    for err in output {
+        if err != 0 {
+            println!("Got an err: {}", err);
+            panic!();
+        }
+    }
+
+    return diagnostic;
+}
 
 #[cfg(test)]
 mod tests {
@@ -271,6 +329,163 @@ mod tests {
         assert_eq!(
             run_program(vec![1002, 4, 3, 4, 33], 42),
             (vec![1002, 4, 3, 4, 99], vec![])
+        );
+    }
+
+    #[test]
+    fn jump_comp() {
+        // EQ 8, positional
+        assert_eq!(
+            run_program(vec![3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8], 42),
+            (vec![3, 9, 8, 9, 10, 9, 4, 9, 99, 0, 8], vec![0])
+        );
+        assert_eq!(
+            run_program(vec![3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8], 2),
+            (vec![3, 9, 8, 9, 10, 9, 4, 9, 99, 0, 8], vec![0])
+        );
+        assert_eq!(
+            run_program(vec![3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8], 8),
+            (vec![3, 9, 8, 9, 10, 9, 4, 9, 99, 1, 8], vec![1])
+        );
+
+        // LT 8, positional
+        assert_eq!(
+            run_program(vec![3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8], 42),
+            (vec![3, 9, 7, 9, 10, 9, 4, 9, 99, 0, 8], vec![0])
+        );
+        assert_eq!(
+            run_program(vec![3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8], 2),
+            (vec![3, 9, 7, 9, 10, 9, 4, 9, 99, 1, 8], vec![1])
+        );
+        assert_eq!(
+            run_program(vec![3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8], 8),
+            (vec![3, 9, 7, 9, 10, 9, 4, 9, 99, 0, 8], vec![0])
+        );
+        // EQ 8, immediate
+        assert_eq!(
+            run_program(vec![3, 3, 1108, -1, 8, 3, 4, 3, 99], 42),
+            (vec![3, 3, 1108, 0, 8, 3, 4, 3, 99], vec![0])
+        );
+        assert_eq!(
+            run_program(vec![3, 3, 1108, -1, 8, 3, 4, 3, 99], 2),
+            (vec![3, 3, 1108, 0, 8, 3, 4, 3, 99], vec![0])
+        );
+        assert_eq!(
+            run_program(vec![3, 3, 1108, -1, 8, 3, 4, 3, 99], 8),
+            (vec![3, 3, 1108, 1, 8, 3, 4, 3, 99], vec![1])
+        );
+
+        // LT 8, immediate
+        assert_eq!(
+            run_program(vec![3, 3, 1107, -1, 8, 3, 4, 3, 99], 42),
+            (vec![3, 3, 1107, 0, 8, 3, 4, 3, 99], vec![0])
+        );
+        assert_eq!(
+            run_program(vec![3, 3, 1107, -1, 8, 3, 4, 3, 99], 2),
+            (vec![3, 3, 1107, 1, 8, 3, 4, 3, 99], vec![1])
+        );
+        assert_eq!(
+            run_program(vec![3, 3, 1107, -1, 8, 3, 4, 3, 99], 8),
+            (vec![3, 3, 1107, 0, 8, 3, 4, 3, 99], vec![0])
+        );
+
+        // jump pos
+        assert_eq!(
+            run_program(
+                vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -1, 0, 1, 9],
+                8
+            ),
+            (
+                vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, 8, 1, 1, 9],
+                vec![1]
+            )
+        );
+
+        assert_eq!(
+            run_program(
+                vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -1, 0, 1, 9],
+                0
+            ),
+            (
+                vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, 0, 0, 1, 9],
+                vec![0]
+            )
+        );
+
+        assert_eq!(
+            run_program(
+                vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -1, 0, 1, 9],
+                -3
+            ),
+            (
+                vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -3, 1, 1, 9],
+                vec![1]
+            )
+        );
+
+        // jump immediate
+        assert_eq!(
+            run_program(vec![3, 3, 1105, -1, 9, 1101, 0, 0, 12, 4, 12, 99, 1], 8),
+            (
+                vec![3, 3, 1105, 8, 9, 1101, 0, 0, 12, 4, 12, 99, 1],
+                vec![1]
+            )
+        );
+
+        assert_eq!(
+            run_program(vec![3, 3, 1105, -1, 9, 1101, 0, 0, 12, 4, 12, 99, 1], 0),
+            (
+                vec![3, 3, 1105, 0, 9, 1101, 0, 0, 12, 4, 12, 99, 0],
+                vec![0]
+            )
+        );
+
+        assert_eq!(
+            run_program(vec![3, 3, 1105, -1, 9, 1101, 0, 0, 12, 4, 12, 99, 1], -3),
+            (
+                vec![3, 3, 1105, -3, 9, 1101, 0, 0, 12, 4, 12, 99, 1],
+                vec![1]
+            )
+        );
+
+        // Final Answer
+        assert_eq!(
+            run_program(
+                vec![
+                    3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0,
+                    36, 98, 0, 0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46,
+                    1101, 1000, 1, 20, 4, 20, 1105, 1, 46, 98, 99
+                ],
+                8
+            )
+            .1,
+            vec![1000]
+        );
+
+        assert_eq!(
+            run_program(
+                vec![
+                    3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0,
+                    36, 98, 0, 0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46,
+                    1101, 1000, 1, 20, 4, 20, 1105, 1, 46, 98, 99
+                ],
+                12
+            )
+            .1,
+            vec![1001]
+        );
+
+        assert_eq!(
+            run_program(
+                vec![
+                    3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0,
+                    36, 98, 0, 0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46,
+                    1101, 1000, 1, 20, 4, 20, 1105, 1, 46, 98, 99
+                ],
+                -3
+            )
+            .1,
+            vec![999]
         );
     }
 }
