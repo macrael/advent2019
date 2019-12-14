@@ -1,7 +1,33 @@
 use std::convert::TryInto;
 
+#[derive(Debug, PartialEq)]
+enum OpCode {
+    Add,
+    Mult,
+    Input,
+    Output,
+    Halt,
+}
+
+#[derive(Debug, PartialEq)]
+enum ArgMode {
+    Position,
+    Immediate,
+}
+
+fn parse_mode(mode_code: i32) -> ArgMode {
+    if mode_code == 0 {
+        ArgMode::Position
+    } else if mode_code == 1 {
+        ArgMode::Immediate
+    } else {
+        println!("Unepxected Mode: {}", mode_code);
+        panic!()
+    }
+}
+
 // code, mode1, mode2, mode3
-fn parse_code(code: i32) -> (i32, i32, i32, i32) {
+fn parse_code(code: i32) -> (OpCode, ArgMode, ArgMode, ArgMode) {
     let mut parsed_code = code;
 
     let ten_thousands = parsed_code / 10_000;
@@ -13,7 +39,32 @@ fn parse_code(code: i32) -> (i32, i32, i32, i32) {
     let hundreads = parsed_code / 100;
     parsed_code = parsed_code - (100 * hundreads);
 
-    return (parsed_code, hundreads, thousands, ten_thousands);
+    let op = match parsed_code {
+        1 => OpCode::Add,
+        2 => OpCode::Mult,
+        3 => OpCode::Input,
+        4 => OpCode::Output,
+
+        99 => OpCode::Halt,
+
+        _ => panic!(),
+    };
+
+    let m1 = parse_mode(hundreads);
+    let m2 = parse_mode(thousands);
+    let m3 = parse_mode(ten_thousands);
+
+    return (op, m1, m2, m3);
+}
+
+fn get_arg(program: &Vec<i32>, position: usize, mode: ArgMode) -> i32 {
+    match mode {
+        ArgMode::Position => {
+            let arg_i: usize = program[position].try_into().unwrap();
+            program[arg_i]
+        }
+        ArgMode::Immediate => program[position],
+    }
 }
 
 // returns (program_state, output)
@@ -25,47 +76,13 @@ fn run_program(program: Vec<i32>, input: i32) -> (Vec<i32>, Vec<i32>) {
     let mut output = vec![];
 
     loop {
-        let (opcode, m1, m2, m3) = parse_code(prog[pc]);
-        println!("Opcode: {}", opcode);
-        // let opcode = prog[pc];
+        let (opcode, m1, m2, _m3) = parse_code(prog[pc]);
+        println!("Opcode: {:?}", opcode);
         match opcode {
-            1 => {
+            OpCode::Add => {
                 // Addition
-                // a
-                let a: i32;
-                if m1 == 1 {
-                    a = prog[pc + 1];
-                } else if m1 == 0 {
-                    let a_i: usize = prog[pc + 1].try_into().unwrap();
-                    a = prog[a_i];
-                } else {
-                    println!("Unexpected! a{}", m1);
-                    panic!();
-                }
-
-                //b
-                let b: i32;
-                if m2 == 1 {
-                    b = prog[pc + 2];
-                } else if m2 == 0 {
-                    let b_i: usize = prog[pc + 2].try_into().unwrap();
-                    b = prog[b_i];
-                } else {
-                    println!("Unexpected! a{}", m1);
-                    panic!();
-                }
-
-                // dest
-                // let dest: i32;
-                // if m3 == 1 {
-                //     dest = prog[pc + 3];
-                // } else if m3 == 0 {
-                //     let d_i: usize = prog[pc + 3].try_into().unwrap();
-                //     dest = prog[d_i];
-                // } else {
-                //     println!("Unexpected! a{}", m1);
-                //     panic!();
-                // }
+                let a = get_arg(&prog, pc + 1, m1);
+                let b = get_arg(&prog, pc + 2, m2);
 
                 let dest: usize = prog[pc + 3].try_into().unwrap();
 
@@ -73,31 +90,10 @@ fn run_program(program: Vec<i32>, input: i32) -> (Vec<i32>, Vec<i32>) {
 
                 pc += 4
             }
-            2 => {
+            OpCode::Mult => {
                 // multplication
-                // a
-                let a: i32;
-                if m1 == 1 {
-                    a = prog[pc + 1];
-                } else if m1 == 0 {
-                    let a_i: usize = prog[pc + 1].try_into().unwrap();
-                    a = prog[a_i];
-                } else {
-                    println!("Unexpected! a{}", m1);
-                    panic!();
-                }
-
-                //b
-                let b: i32;
-                if m2 == 1 {
-                    b = prog[pc + 2];
-                } else if m2 == 0 {
-                    let b_i: usize = prog[pc + 2].try_into().unwrap();
-                    b = prog[b_i];
-                } else {
-                    println!("Unexpected! a{}", m1);
-                    panic!();
-                }
+                let a = get_arg(&prog, pc + 1, m1);
+                let b = get_arg(&prog, pc + 2, m2);
 
                 let dest: usize = prog[pc + 3].try_into().unwrap();
 
@@ -105,7 +101,7 @@ fn run_program(program: Vec<i32>, input: i32) -> (Vec<i32>, Vec<i32>) {
 
                 pc += 4
             }
-            3 => {
+            OpCode::Input => {
                 // store input
                 let dest: usize = prog[pc + 1].try_into().unwrap();
 
@@ -113,34 +109,18 @@ fn run_program(program: Vec<i32>, input: i32) -> (Vec<i32>, Vec<i32>) {
 
                 pc += 2
             }
-            4 => {
+            OpCode::Output => {
                 // send output
-                // a
-                let a: i32;
-                if m1 == 1 {
-                    a = prog[pc + 1];
-                } else if m1 == 0 {
-                    let a_i: usize = prog[pc + 1].try_into().unwrap();
-                    a = prog[a_i];
-                } else {
-                    println!("Unexpected! a{}", m1);
-                    panic!();
-                }
 
-                // let index: usize = prog[pc + 1].try_into().unwrap();
+                let a = get_arg(&prog, pc + 1, m1);
 
                 output.push(a);
 
                 pc += 2
             }
-            99 => {
+            OpCode::Halt => {
                 // exit
                 break;
-            }
-            _ => {
-                // this is bad.panic!
-                println!("unknown Op: {}", opcode);
-                panic!();
             }
         }
     }
@@ -247,9 +227,33 @@ mod tests {
 
     #[test]
     fn parse_code_test() {
-        assert_eq!(parse_code(1101), (1, 1, 1, 0));
-        assert_eq!(parse_code(1102), (2, 1, 1, 0));
-        assert_eq!(parse_code(10101), (1, 1, 0, 1));
+        assert_eq!(
+            parse_code(1101),
+            (
+                OpCode::Add,
+                ArgMode::Immediate,
+                ArgMode::Immediate,
+                ArgMode::Position
+            )
+        );
+        assert_eq!(
+            parse_code(1102),
+            (
+                OpCode::Mult,
+                ArgMode::Immediate,
+                ArgMode::Immediate,
+                ArgMode::Position
+            )
+        );
+        assert_eq!(
+            parse_code(10101),
+            (
+                OpCode::Add,
+                ArgMode::Immediate,
+                ArgMode::Position,
+                ArgMode::Immediate
+            )
+        );
     }
 
     #[test]
